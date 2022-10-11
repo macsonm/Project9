@@ -6,7 +6,7 @@ class TableViewController: UITableViewController {
     
     override func viewDidLoad() {
         super.viewDidLoad()
-
+        
         let urlString: String
         
         if navigationController?.tabBarItem.tag == 0 {
@@ -15,26 +15,33 @@ class TableViewController: UITableViewController {
             urlString = "https://www.hackingwithswift.com/samples/petitions-2.json"
         }
         
-        if let url = URL(string: urlString) {
-            if let data = try? Data(contentsOf: url) {
-                parse(json: data)
-                return
+        DispatchQueue.global(qos: .userInitiated).async { [ weak self ] in
+            if let url = URL(string: urlString) {
+                if let data = try? Data(contentsOf: url) {
+                    self?.parse(json: data)   //переведен в фоновый поток, надо вернуть действия с UI обратно на главный поток в методе parse
+                    return
+                }
             }
+            self?.showError() //переведен в фоновый поток, надо вернуть действия с UI обратно на главный поток в методе showError
         }
-        showError()
     }
     
     func showError() {
-        let ac = UIAlertController(title: "network error", message: "check your connection", preferredStyle: .alert)
-        ac.addAction(UIAlertAction(title: "OK", style: .default, handler: nil))
-        present(ac, animated: true)
+        DispatchQueue.main.async { [ weak self ] in //вернули на главный поток
+            let ac = UIAlertController(title: "network error", message: "check your connection", preferredStyle: .alert)
+            ac.addAction(UIAlertAction(title: "OK", style: .default, handler: nil))
+            self?.present(ac, animated: true)
+        }
     }
     
     func parse(json: Data) {
         let decoder = JSONDecoder()
         if let jsonPetitions = try? decoder.decode(Petitions.self, from: json) {
             petitions = jsonPetitions.results
-            tableView.reloadData()
+            
+            DispatchQueue.main.async { [ weak self ] in //вернули на главный поток
+                self?.tableView.reloadData()
+            }
         }
     }
     
